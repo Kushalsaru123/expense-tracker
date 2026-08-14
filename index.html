@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#c05621">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Income &amp; Expense Tracker</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+
+:root {
+  --accent: #6366f1;
+  --income: #10b981;
+  --expense: #ef4444;
+  --ink: #0f172a;
+  --dim: #64748b;
+  --line: #e2e8f0;
+  --panel: #f8fafc;
+  --mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  background: radial-gradient(circle at top left, #1e293b, #0f172a);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px 16px 60px;
+  color: var(--ink);
+}
+
+/* Auth Modal Overlay */
+.auth-overlay {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: radial-gradient(circle at top left, #1e293b, #0f172a);
+  display: flex; justify-content: center; align-items: center;
+  padding: 20px; z-index: 2000; transition: opacity 0.3s ease;
+}
+.auth-overlay.hidden { display: none; }
+
+.auth-card {
+  width: 100%; max-width: 400px;
+  background: #ffffff; padding: 32px 28px;
+  border-radius: 24px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.auth-tabs {
+  display: flex; gap: 8px; margin-bottom: 20px; background: var(--panel); padding: 4px; border-radius: 12px;
+}
+.auth-tab {
+  flex: 1; text-align: center; padding: 10px; font-size: 13px; font-weight: 700;
+  border-radius: 8px; cursor: pointer; color: var(--dim); transition: all 0.2s;
+}
+.auth-tab.active { background: #fff; color: var(--ink); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+
+.auth-card h2 { font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+.auth-card p { font-size: 13px; color: var(--dim); margin-bottom: 20px; }
+.auth-msg { font-size: 12px; font-weight: 600; margin-bottom: 12px; padding: 10px; border-radius: 8px; display: none; }
+.auth-msg.error { background: #fee2e2; color: var(--expense); }
+.auth-msg.success { background: #d1fae5; color: var(--income); }
+
+/* Main App UI */
+.app-container { width: 100%; max-width: 440px; }
+.app-container.hidden { display: none; }
+
+.card {
+  width: 100%; background: #ffffff; padding: 32px 28px;
+  border-radius: 24px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+.header h2 { font-size: 22px; font-weight: 700; color: var(--ink); }
+.header p { font-size: 13px; color: var(--dim); margin-top: 4px; }
+
+.header-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.header-top-row { display: flex; align-items: center; gap: 10px; }
+
+.logout-btn { background: #fee2e2; color: var(--expense); border: none; padding: 4px 10px; border-radius: 8px; font-weight: 600; font-size: 11px; cursor: pointer; }
+
+.status-dot {
+  display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--dim); font-family: var(--mono);
+  padding: 5px 9px; border: 1px solid var(--line); border-radius: 999px;
+}
+.status-dot .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--income); }
+
+.type-switcher { display: flex; background: #f1f5f9; padding: 4px; border-radius: 14px; margin-bottom: 20px; }
+.type-option { flex: 1; text-align: center; padding: 10px; font-size: 14px; font-weight: 600; color: var(--dim); border-radius: 10px; cursor: pointer; }
+.type-option.active.expense { background: var(--expense); color: #fff; }
+.type-option.active.income { background: var(--income); color: #fff; }
+
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.full-width { grid-column: span 2; }
+.form-group { display: flex; flex-direction: column; }
+label { font-size: 12px; font-weight: 600; text-transform: uppercase; color: #475569; margin-bottom: 6px; }
+
+input, select, textarea {
+  width: 100%; padding: 12px 14px; background: var(--panel);
+  border: 1.5px solid var(--line); border-radius: 12px; font-size: 14px; color: var(--ink); outline: none;
+}
+input:focus, select:focus, textarea:focus { background: #fff; border-color: var(--accent); }
+#amountInput { font-family: var(--mono); }
+textarea { height: 60px; resize: none; }
+
+.btn-submit {
+  grid-column: span 2; margin-top: 4px; padding: 14px; background: var(--ink); color: #fff;
+  border: none; border-radius: 14px; font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.btn-cancel-edit {
+  background: #fee2e2; color: var(--expense); margin-top: 8px; font-size: 13px; font-weight: 600; padding: 8px; border-radius: 10px; border: none; cursor: pointer; display: none; text-align: center; width: 100%;
+}
+
+.view-records-link { text-align: center; margin-top: 14px; }
+.view-records-link button { background: none; border: none; font-size: 14px; color: var(--accent); font-weight: 600; cursor: pointer; }
+
+/* Modal & Filter Styles */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);
+  display: flex; justify-content: center; align-items: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.3s ease; padding: 20px; z-index: 999;
+}
+.modal-overlay.active { opacity: 1; pointer-events: auto; }
+.modal-card {
+  background: white; width: 100%; max-width: 720px; max-height: 90vh;
+  border-radius: 24px; padding: 24px; display: flex; flex-direction: column; overflow: hidden;
+}
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.close-btn { background: #f1f5f9; border: none; font-size: 18px; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; }
+
+.summary-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+.summary-card { background: #fff; padding: 14px 12px; border-radius: 16px; text-align: center; border: 1px solid var(--line); }
+.summary-card span { font-size: 11px; font-weight: 700; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; }
+.summary-card h4 { font-size: 18px; margin-top: 4px; font-family: var(--mono); font-weight: 700; }
+
+.filter-bar {
+  display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: 10px; margin-bottom: 12px;
+}
+.filter-bar select, .filter-bar input {
+  padding: 10px 12px; font-size: 13px; border-radius: 12px; background: #fff; border: 1px solid var(--line);
+}
+
+.cat-breakdown-toggle {
+  color: var(--accent); font-size: 13px; font-weight: 700; cursor: pointer; margin-bottom: 12px; display: inline-block;
+}
+.cat-breakdown-box {
+  display: none; background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 12px; margin-bottom: 16px; font-size: 12px;
+}
+.cat-item { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed var(--line); }
+.cat-item:last-child { border-bottom: none; }
+
+.table-wrapper { overflow-y: auto; flex-grow: 1; border-radius: 12px; border: 1px solid var(--line); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+th, td { padding: 12px 10px; border-bottom: 1px solid var(--line); }
+th { background: var(--panel); color: #475569; position: sticky; top: 0; font-weight: 700; }
+.tag { padding: 3px 8px; border-radius: 6px; font-weight: 600; font-size: 11px; }
+.tag.expense { background: #fee2e2; color: var(--expense); }
+.tag.income { background: #d1fae5; color: var(--income); }
+
+.action-btn { background: none; border: none; font-weight: 600; font-size: 12px; cursor: pointer; }
+.action-edit { color: var(--accent); margin-right: 8px; }
+.action-delete { color: var(--expense); font-weight: 700; }
+
+.modal-footer {
+  display: flex; gap: 10px; margin-top: 16px;
+}
+.btn-footer-export {
+  background: #f1f5f9; color: var(--accent); border: none; padding: 10px 16px;
+  border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer;
+}
+.btn-footer-clear {
+  background: #fee2e2; color: var(--expense); border: none; padding: 10px 16px;
+  border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer;
+}
+
+.toast {
+  position: fixed; bottom: 24px; right: 24px; background: #10b981; color: #fff;
+  padding: 12px 20px; border-radius: 12px; font-weight: 600; font-size: 14px;
+  transform: translateY(100px); opacity: 0; transition: all 0.3s ease; z-index: 3000;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+
+@media (max-width: 600px) {
+  .filter-bar { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- AUTH MODAL -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-card">
+    <div class="auth-tabs" id="authTabs">
+      <div class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Log In</div>
+      <div class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Sign Up</div>
+    </div>
+
+    <h2 id="authTitle">Welcome Back</h2>
+    <p id="authSubtitle">Log in to your account</p>
+    <div class="auth-msg" id="authMsg"></div>
+
+    <!-- MAIN LOGIN / SIGNUP FORM -->
+    <form id="authForm" class="form-grid">
+      <div class="form-group full-width" id="usernameGroup">
+        <label>Username</label>
+        <input type="text" id="usernameInput" placeholder="Enter username" required>
+      </div>
+
+      <div class="form-group full-width" id="emailGroup" style="display: none; margin-top: 10px;">
+        <label>Email Address</label>
+        <input type="email" id="emailInput" placeholder="name@example.com">
+      </div>
+
+      <div class="form-group full-width" id="passwordGroup" style="margin-top: 10px;">
+        <label>Password</label>
+        <input type="password" id="passwordInput" placeholder="••••••••" required>
+      </div>
+
+      <div class="full-width" id="forgotLinkWrapper" style="text-align: right; margin-top: 6px;">
+        <a href="#" onclick="showForgotPasswordView(event)" style="font-size: 12px; color: var(--accent); text-decoration: none; font-weight: 600;">Forgot Password?</a>
+      </div>
+
+      <button type="submit" class="btn-submit" id="authSubmitBtn" style="margin-top: 16px;">Log In</button>
+    </form>
+
+    <!-- SIGNUP OTP VERIFICATION FORM -->
+    <form id="signupOtpForm" class="form-grid" style="display: none;">
+      <div class="form-group full-width">
+        <label>6-Digit Verification Code</label>
+        <input type="text" id="signupOtpInput" placeholder="123456" maxlength="6" style="letter-spacing: 4px; font-size: 18px; text-align: center; font-family: var(--mono);" required>
+      </div>
+      <button type="submit" class="btn-submit" id="verifySignupBtn" style="margin-top: 16px;">Verify &amp; Create Account</button>
+      <div class="full-width" style="text-align: center; margin-top: 10px;">
+        <a href="#" onclick="cancelSignupOtp(event)" style="font-size: 12px; color: var(--dim); text-decoration: none;">← Cancel &amp; Back</a>
+      </div>
+    </form>
+
+    <!-- FORGOT PASSWORD STEP 1 FORM -->
+    <form id="forgotReqForm" class="form-grid" style="display: none;">
+      <div class="form-group full-width">
+        <label>Username or Email</label>
+        <input type="text" id="forgotTargetInput" placeholder="Enter username or email" required>
+      </div>
+      <button type="submit" class="btn-submit" id="forgotReqBtn" style="margin-top: 16px;">Send Reset Code</button>
+      <div class="full-width" style="text-align: center; margin-top: 10px;">
+        <a href="#" onclick="switchAuthTab('login'); event.preventDefault();" style="font-size: 12px; color: var(--accent); text-decoration: none; font-weight: 600;">← Back to Log In</a>
+      </div>
+    </form>
+
+    <!-- FORGOT PASSWORD STEP 2 FORM -->
+    <form id="forgotResetForm" class="form-grid" style="display: none;">
+      <div class="form-group full-width">
+        <label>6-Digit Reset Code</label>
+        <input type="text" id="resetOtpInput" placeholder="123456" maxlength="6" style="letter-spacing: 4px; font-size: 18px; text-align: center; font-family: var(--mono);" required>
+      </div>
+      <div class="form-group full-width" style="margin-top: 10px;">
+        <label>New Password</label>
+        <input type="password" id="newPasswordInput" placeholder="Enter new password" required>
+      </div>
+      <button type="submit" class="btn-submit" id="resetPasswordBtn" style="margin-top: 16px;">Update Password</button>
+      <div class="full-width" style="text-align: center; margin-top: 10px;">
+        <a href="#" onclick="switchAuthTab('login'); event.preventDefault();" style="font-size: 12px; color: var(--accent); text-decoration: none; font-weight: 600;">← Back to Log In</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="app-container hidden" id="appContainer">
+  <div class="card">
+      <div class="header">
+        <div>
+          <h2 id="formHeaderTitle">Add Transaction</h2>
+          <p id="welcomeUser">Logged in as...</p>
+        </div>
+        <div class="header-actions">
+          <div class="header-top-row">
+            <div class="status-dot"><span class="dot"></span><span>Online</span></div>
+          </div>
+          <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+      </div>
+
+      <div class="type-switcher">
+          <div class="type-option active expense" id="typeExpense" onclick="setType('Expense')">Expense</div>
+          <div class="type-option" id="typeIncome" onclick="setType('Income')">Income</div>
+      </div>
+
+      <form class="form-grid" id="transactionForm">
+          <input type="hidden" id="entryType" value="Expense">
+
+          <div class="form-group">
+              <label>Date</label>
+              <input type="date" id="dateInput" required>
+          </div>
+
+          <div class="form-group">
+              <label>Time</label>
+              <input type="time" id="timeInput" required>
+          </div>
+
+          <div class="form-group">
+              <label>Amount (€)</label>
+              <input type="number" id="amountInput" step="0.01" placeholder="0.00" required>
+          </div>
+
+          <div class="form-group">
+              <label>Payment Method</label>
+              <select id="methodInput">
+                  <option>Card</option>
+                  <option>Cash</option>
+                  <option>Bank Transfer</option>
+                  <option>Online Wallet</option>
+              </select>
+          </div>
+
+          <div class="form-group full-width">
+              <label>Category</label>
+              <select id="categoryInput" required></select>
+          </div>
+
+          <div class="form-group full-width">
+              <label>Description</label>
+              <input type="text" id="descInput" placeholder="e.g. Grocery shopping">
+          </div>
+
+          <div class="form-group full-width">
+              <label>Remarks</label>
+              <textarea id="remarksInput" placeholder="Optional notes..."></textarea>
+          </div>
+
+          <button type="submit" class="btn-submit" id="submitBtn">Save Transaction</button>
+          <button type="button" class="btn-cancel-edit full-width" id="cancelEditBtn" onclick="resetFormState()">Cancel Editing</button>
+      </form>
+
+      <div class="full-width view-records-link">
+          <button type="button" onclick="toggleModal(true)">View Saved Transactions</button>
+      </div>
+  </div>
+</div>
+
+<!-- RECORDS MODAL WITH FILTERS -->
+<div class="modal-overlay" id="recordsModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Transaction Records</h3>
+            <button class="close-btn" onclick="toggleModal(false)">×</button>
+        </div>
+
+        <!-- SUMMARY CARDS -->
+        <div class="summary-container">
+            <div class="summary-card"><span>Income</span><h4 id="totalIncome" style="color:var(--income)">€0.00</h4></div>
+            <div class="summary-card"><span>Expense</span><h4 id="totalExpense" style="color:var(--expense)">€0.00</h4></div>
+            <div class="summary-card"><span>Balance</span><h4 id="remainingBalance" style="color:var(--accent)">€0.00</h4></div>
+        </div>
+
+        <!-- FILTER CONTROLS BAR -->
+        <div class="filter-bar">
+            <select id="monthFilter" onchange="filterRecords()">
+                <option value="ALL">All months</option>
+            </select>
+            <select id="typeFilter" onchange="filterRecords()">
+                <option value="ALL">All types</option>
+                <option value="Income">Income</option>
+                <option value="Expense">Expense</option>
+            </select>
+            <input type="text" id="searchInput" placeholder="Search description or remarks." oninput="filterRecords()">
+        </div>
+
+        <!-- CATEGORY BREAKDOWN LINK -->
+        <div>
+            <span class="cat-breakdown-toggle" id="catToggleBtn" onclick="toggleCatBreakdown()">Show category breakdown ▾</span>
+            <div class="cat-breakdown-box" id="catBreakdownBox"></div>
+        </div>
+
+        <!-- TRANSACTIONS TABLE -->
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Date &amp; Time</th>
+                        <th>Category</th>
+                        <th>Desc</th>
+                        <th>Amount</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="recordsTableBody"></tbody>
+            </table>
+        </div>
+
+        <!-- MODAL FOOTER BUTTONS -->
+        <div class="modal-footer">
+            <button class="btn-footer-export" onclick="exportCSV()">Export CSV</button>
+            <button class="btn-footer-clear" onclick="clearLocalRecords()">Clear Local Records</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastMsg">✓ Saved!</span></div>
+
+<script>
+    const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbzh5ioLWNTJpPhySH0ep_Q7ocw_O6RAXHl7a1nqIg5dut1mTs7MHsfT6Tlq2PIJMH6VrQ/exec";
+
+    let currentAuthMode = 'login';
+    let currentUser = null;
+    let transactions = [];
+    let pendingSignupUser = '';
+    let pendingResetTarget = '';
+
+    // Edit tracking state
+    let editingRowIndex = null;
+    let editingTransactionId = null;
+
+    const EXPENSE_CATS = ['Groceries', 'Shopping', 'Food & Dining', 'Transport', 'Rent', 'Utilities', 'Medical', 'Other'];
+    const INCOME_CATS = ['Salary', 'Part Time Work', 'Other'];
+
+    const el = id => document.getElementById(id);
+
+    function showToast(text) {
+        const toast = el('toast');
+        el('toastMsg').innerText = text;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    function toggleModal(show) {
+        el('recordsModal').classList.toggle('active', show);
+    }
+
+    function hideAllAuthForms() {
+        el('authForm').style.display = 'none';
+        el('signupOtpForm').style.display = 'none';
+        el('forgotReqForm').style.display = 'none';
+        el('forgotResetForm').style.display = 'none';
+        el('authMsg').style.display = 'none';
+    }
+
+    function switchAuthTab(mode) {
+        currentAuthMode = mode;
+        hideAllAuthForms();
+        el('authTabs').style.display = 'flex';
+
+        el('tabLogin').classList.toggle('active', mode === 'login');
+        el('tabSignup').classList.toggle('active', mode === 'signup');
+        
+        el('authTitle').innerText = mode === 'login' ? 'Welcome Back' : 'Create Account';
+        el('authSubtitle').innerText = mode === 'login' ? 'Log in to your account' : 'Sign up for personal tracker';
+        el('authSubmitBtn').innerText = mode === 'login' ? 'Log In' : 'Send Verification Code';
+        
+        el('authForm').style.display = 'grid';
+
+        if (mode === 'signup') {
+            el('emailGroup').style.display = 'flex';
+            el('emailInput').required = true;
+            el('forgotLinkWrapper').style.display = 'none';
+        } else {
+            el('emailGroup').style.display = 'none';
+            el('emailInput').required = false;
+            el('forgotLinkWrapper').style.display = 'block';
+        }
+    }
+
+    // MAIN AUTH SUBMIT (Login OR Send Signup OTP)
+    el('authForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const user = el('usernameInput').value.trim();
+        const email = el('emailInput').value.trim();
+        const pass = el('passwordInput').value.trim();
+        const msg = el('authMsg');
+
+        el('authSubmitBtn').disabled = true;
+        el('authSubmitBtn').innerText = "Processing...";
+
+        try {
+            if (currentAuthMode === 'signup') {
+                const response = await fetch(GOOGLE_SHEET_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'sendSignupOTP', username: user, email: email, password: pass })
+                });
+                const res = await response.json();
+
+                if (res.success) {
+                    pendingSignupUser = user;
+                    hideAllAuthForms();
+                    el('authTabs').style.display = 'none';
+                    el('signupOtpForm').style.display = 'grid';
+                    el('authTitle').innerText = "Verify Email";
+                    el('authSubtitle').innerText = `Enter the 6-digit code sent to ${email}`;
+                    msg.className = 'auth-msg success';
+                    msg.innerText = res.message;
+                    msg.style.display = 'block';
+                } else {
+                    msg.className = 'auth-msg error';
+                    msg.innerText = res.message || "Sign up failed.";
+                    msg.style.display = 'block';
+                }
+            } else {
+                // LOG IN ACTION
+                const response = await fetch(GOOGLE_SHEET_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'login', username: user, password: pass })
+                });
+                const res = await response.json();
+
+                if (res.success) {
+                    loginSuccess(res.user);
+                } else {
+                    msg.className = 'auth-msg error';
+                    msg.innerText = res.message || "Invalid username or password.";
+                    msg.style.display = 'block';
+                }
+            }
+        } catch (err) {
+            msg.className = 'auth-msg error';
+            msg.innerText = "Connection failed. Please check network.";
+            msg.style.display = 'block';
+        } finally {
+            el('authSubmitBtn').disabled = false;
+            el('authSubmitBtn').innerText = currentAuthMode === 'login' ? 'Log In' : 'Send Verification Code';
+        }
+    });
+
+    // VERIFY SIGNUP OTP SUBMIT
+    el('signupOtpForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const otp = el('signupOtpInput').value.trim();
+        const msg = el('authMsg');
+
+        el('verifySignupBtn').disabled = true;
+        el('verifySignupBtn').innerText = "Verifying...";
+
+        try {
+            const response = await fetch(GOOGLE_SHEET_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'verifySignup', username: pendingSignupUser, otp: otp })
+            });
+            const res = await response.json();
+
+            if (res.success) {
+                msg.className = 'auth-msg success';
+                msg.innerText = "Verified! Logging you in...";
+                msg.style.display = 'block';
+                setTimeout(() => loginSuccess(res.user), 1200);
+            } else {
+                msg.className = 'auth-msg error';
+                msg.innerText = res.message || "Invalid verification code.";
+                msg.style.display = 'block';
+            }
+        } catch (err) {
+            msg.className = 'auth-msg error';
+            msg.innerText = "Connection failed.";
+            msg.style.display = 'block';
+        } finally {
+            el('verifySignupBtn').disabled = false;
+            el('verifySignupBtn').innerText = "Verify & Create Account";
+        }
+    });
+
+    function cancelSignupOtp(e) {
+        e.preventDefault();
+        switchAuthTab('signup');
+    }
+
+    // FORGOT PASSWORD FLOW
+    function showForgotPasswordView(e) {
+        if (e) e.preventDefault();
+        hideAllAuthForms();
+        el('authTabs').style.display = 'none';
+        el('forgotReqForm').style.display = 'grid';
+        el('authTitle').innerText = "Forgot Password";
+        el('authSubtitle').innerText = "Enter your username or registered email";
+    }
+
+    // REQUEST RESET OTP SUBMIT
+    el('forgotReqForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const target = el('forgotTargetInput').value.trim();
+        const msg = el('authMsg');
+
+        el('forgotReqBtn').disabled = true;
+        el('forgotReqBtn').innerText = "Sending Code...";
+
+        try {
+            const response = await fetch(GOOGLE_SHEET_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'requestResetOTP', emailOrUsername: target })
+            });
+            const res = await response.json();
+
+            if (res.success) {
+                pendingResetTarget = target;
+                hideAllAuthForms();
+                el('forgotResetForm').style.display = 'grid';
+                el('authTitle').innerText = "Reset Password";
+                el('authSubtitle').innerText = "Enter the 6-digit code sent to your email";
+                msg.className = 'auth-msg success';
+                msg.innerText = res.message;
+                msg.style.display = 'block';
+            } else {
+                msg.className = 'auth-msg error';
+                msg.innerText = res.message || "Account not found.";
+                msg.style.display = 'block';
+            }
+        } catch (err) {
+            msg.className = 'auth-msg error';
+            msg.innerText = "Connection failed.";
+            msg.style.display = 'block';
+        } finally {
+            el('forgotReqBtn').disabled = false;
+            el('forgotReqBtn').innerText = "Send Reset Code";
+        }
+    });
+
+    // SUBMIT NEW PASSWORD + RESET OTP
+    el('forgotResetForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const otp = el('resetOtpInput').value.trim();
+        const newPass = el('newPasswordInput').value.trim();
+        const msg = el('authMsg');
+
+        el('resetPasswordBtn').disabled = true;
+        el('resetPasswordBtn').innerText = "Updating...";
+
+        try {
+            const response = await fetch(GOOGLE_SHEET_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'resetPassword', emailOrUsername: pendingResetTarget, otp: otp, newPassword: newPass })
+            });
+            const res = await response.json();
+
+            if (res.success) {
+                msg.className = 'auth-msg success';
+                msg.innerText = res.message;
+                msg.style.display = 'block';
+                setTimeout(() => {
+                    switchAuthTab('login');
+                }, 2000);
+            } else {
+                msg.className = 'auth-msg error';
+                msg.innerText = res.message || "Reset failed.";
+                msg.style.display = 'block';
+            }
+        } catch (err) {
+            msg.className = 'auth-msg error';
+            msg.innerText = "Connection failed.";
+            msg.style.display = 'block';
+        } finally {
+            el('resetPasswordBtn').disabled = false;
+            el('resetPasswordBtn').innerText = "Update Password";
+        }
+    });
+
+    function loginSuccess(user) {
+        currentUser = user;
+        localStorage.setItem('userSession', JSON.stringify(user));
+        el('authOverlay').classList.add('hidden');
+        el('appContainer').classList.remove('hidden');
+        el('welcomeUser').innerText = `User: ${user.username}`;
+        initApp();
+    }
+
+    function logout() {
+        localStorage.removeItem('userSession');
+        currentUser = null;
+        el('appContainer').classList.add('hidden');
+        el('authOverlay').classList.remove('hidden');
+        switchAuthTab('login');
+    }
+
+    function checkSession() {
+        const saved = localStorage.getItem('userSession');
+        if (saved) {
+            currentUser = JSON.parse(saved);
+            el('authOverlay').classList.add('hidden');
+            el('appContainer').classList.remove('hidden');
+            el('welcomeUser').innerText = `User: ${currentUser.username}`;
+            initApp();
+        }
+    }
+
+    function setType(type) {
+        el('entryType').value = type;
+        el('typeExpense').className = type === 'Expense' ? 'type-option active expense' : 'type-option';
+        el('typeIncome').className = type === 'Income' ? 'type-option active income' : 'type-option';
+        rebuildCategories(type);
+    }
+
+    function rebuildCategories(type) {
+        const cats = type === 'Income' ? INCOME_CATS : EXPENSE_CATS;
+        el('categoryInput').innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+
+    function initApp() {
+        const now = new Date();
+        el('dateInput').value = now.toISOString().split('T')[0];
+        el('timeInput').value = now.toTimeString().slice(0, 5);
+        rebuildCategories('Expense');
+        fetchUserData();
+    }
+
+    async function fetchUserData() {
+        if (!currentUser || !currentUser.sheetId) return;
+        try {
+            const res = await fetch(`${GOOGLE_SHEET_URL}?sheetId=${currentUser.sheetId}`);
+            const data = await res.json();
+            if (data.transactions) {
+                transactions = data.transactions;
+                populateMonthFilter();
+                filterRecords();
+            }
+        } catch (err) {
+            console.error("Failed to load user transactions", err);
+        }
+    }
+
+    // Reset Form back to "Add Transaction" Mode
+    function resetFormState() {
+        editingRowIndex = null;
+        editingTransactionId = null;
+        el('formHeaderTitle').innerText = "Add Transaction";
+        el('submitBtn').innerText = "Save Transaction";
+        el('cancelEditBtn').style.display = 'none';
+        
+        const now = new Date();
+        el('dateInput').value = now.toISOString().split('T')[0];
+        el('timeInput').value = now.toTimeString().slice(0, 5);
+        el('amountInput').value = '';
+        el('descInput').value = '';
+        el('remarksInput').value = '';
+        setType('Expense');
+    }
+
+    // Pre-fill form when clicking "Edit"
+    function editRecord(id) {
+        const t = transactions.find(x => String(x.id) === String(id));
+        if (!t) return;
+
+        editingRowIndex = t.row;
+        editingTransactionId = t.id;
+
+        setType(t.type || 'Expense');
+        if (t.date) el('dateInput').value = t.date;
+        if (t.time) el('timeInput').value = t.time;
+        if (t.amount) el('amountInput').value = t.amount;
+        if (t.method) el('methodInput').value = t.method;
+        if (t.category) el('categoryInput').value = t.category;
+        el('descInput').value = (t.desc && t.desc !== '-') ? t.desc : '';
+        el('remarksInput').value = (t.remarks && t.remarks !== '-') ? t.remarks : '';
+
+        el('formHeaderTitle').innerText = "Edit Transaction";
+        el('submitBtn').innerText = "Update Transaction";
+        el('cancelEditBtn').style.display = 'block';
+
+        toggleModal(false); // Hide records modal so user can see form
+    }
+
+    // SAVE OR UPDATE TRANSACTION
+    el('transactionForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const isEditing = editingRowIndex !== null;
+        const payload = {
+            action: isEditing ? 'editTransaction' : 'addTransaction',
+            sheetId: currentUser.sheetId,
+            row: editingRowIndex,
+            id: isEditing ? editingTransactionId : Date.now().toString(),
+            type: el('entryType').value,
+            date: el('dateInput').value,
+            time: el('timeInput').value,
+            amount: parseFloat(el('amountInput').value),
+            method: el('methodInput').value,
+            category: el('categoryInput').value,
+            desc: el('descInput').value || '-',
+            remarks: el('remarksInput').value || '-'
+        };
+
+        showToast(isEditing ? "Updating..." : "Saving...");
+
+        try {
+            await fetch(GOOGLE_SHEET_URL, { method: 'POST', body: JSON.stringify(payload) });
+            showToast(isEditing ? "Updated!" : "Saved!");
+            resetFormState();
+            fetchUserData();
+        } catch (err) {
+            showToast("Operation failed");
+        }
+    });
+
+    // Populate Dynamic Month Options into Dropdown
+    function populateMonthFilter() {
+        const select = el('monthFilter');
+        const months = new Set();
+        transactions.forEach(t => {
+            if (t.date && t.date.length >= 7) {
+                months.add(t.date.substring(0, 7)); // YYYY-MM
+            }
+        });
+
+        select.innerHTML = `<option value="ALL">All months</option>` + 
+            Array.from(months).sort().reverse().map(m => `<option value="${m}">${m}</option>`).join('');
+    }
+
+    // Filter Logic
+    function filterRecords() {
+        const monthVal = el('monthFilter').value;
+        const typeVal = el('typeFilter').value;
+        const searchVal = el('searchInput').value.toLowerCase().trim();
+
+        const filtered = transactions.filter(t => {
+            const matchesMonth = (monthVal === 'ALL') || (t.date && t.date.startsWith(monthVal));
+            const matchesType = (typeVal === 'ALL') || (t.type === typeVal);
+            const matchesSearch = (searchVal === '') || 
+                (t.desc && t.desc.toLowerCase().includes(searchVal)) || 
+                (t.remarks && t.remarks.toLowerCase().includes(searchVal)) ||
+                (t.category && t.category.toLowerCase().includes(searchVal));
+
+            return matchesMonth && matchesType && matchesSearch;
+        });
+
+        renderRecords(filtered);
+    }
+
+    function renderRecords(listToRender) {
+        let inc = 0, exp = 0;
+        const tbody = el('recordsTableBody');
+
+        tbody.innerHTML = listToRender.slice().reverse().map(r => {
+            const amt = Number(r.amount) || 0;
+            if (r.type === 'Income') inc += amt;
+            else exp += amt;
+
+            const timeDisplay = r.time ? ` ${r.time}` : '';
+
+            return `
+                <tr>
+                    <td><span class="tag ${r.type.toLowerCase()}">${r.type}</span></td>
+                    <td>${r.date || ''}${timeDisplay}</td>
+                    <td><b>${r.category || '-'}</b></td>
+                    <td>${r.desc || '-'}</td>
+                    <td style="font-family: var(--mono); font-weight:700;">€${amt.toFixed(2)}</td>
+                    <td>
+                        <button class="action-btn action-edit" onclick="editRecord('${r.id}')">Edit</button>
+                        <button class="action-btn action-delete" onclick="deleteRecord('${r.id}')">✕</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        el('totalIncome').innerText = `€${inc.toFixed(2)}`;
+        el('totalExpense').innerText = `€${exp.toFixed(2)}`;
+        el('remainingBalance').innerText = `€${(inc - exp).toFixed(2)}`;
+    }
+
+    function toggleCatBreakdown() {
+        const box = el('catBreakdownBox');
+        const isHidden = box.style.display === '' || box.style.display === 'none';
+        box.style.display = isHidden ? 'block' : 'none';
+        el('catToggleBtn').innerText = isHidden ? 'Hide category breakdown ▴' : 'Show category breakdown ▾';
+
+        if (isHidden) {
+            const catMap = {};
+            transactions.forEach(t => {
+                if (t.type === 'Expense') {
+                    const cat = t.category || 'Other';
+                    catMap[cat] = (catMap[cat] || 0) + (Number(t.amount) || 0);
+                }
+            });
+
+            box.innerHTML = Object.entries(catMap).length ? 
+                Object.entries(catMap).map(([cat, amt]) => `
+                    <div class="cat-item">
+                        <span>${cat}</span>
+                        <strong style="font-family: var(--mono)">€${amt.toFixed(2)}</strong>
+                    </div>
+                `).join('') : '<p style="color:var(--dim)">No expense data available.</p>';
+        }
+    }
+
+    async function deleteRecord(id) {
+        const t = transactions.find(x => String(x.id) === String(id));
+        if (!t || !confirm("Are you sure you want to delete this record?")) return;
+
+        showToast("Deleting...");
+        try {
+            await fetch(GOOGLE_SHEET_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'deleteTransaction', sheetId: currentUser.sheetId, row: t.row, id: t.id })
+            });
+            showToast("Deleted!");
+            fetchUserData();
+        } catch (err) {
+            showToast("Failed to delete");
+        }
+    }
+
+    function exportCSV() {
+        if (!transactions.length) return alert("No transactions to export.");
+        const headers = ["Type", "Date", "Time", "Amount", "Method", "Category", "Description", "Remarks"];
+        const rows = transactions.map(t => [
+            t.type, t.date, t.time, t.amount, t.method, t.category, `"${t.desc || ''}"`, `"${t.remarks || ''}"`
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `transactions_${currentUser.username}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function clearLocalRecords() {
+        if (confirm("Clear local session view? (Your Google Sheet data remains safe)")) {
+            transactions = [];
+            renderRecords([]);
+        }
+    }
+
+    // On Load
+    checkSession();
+</script>
+    <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log('PWA Service Worker Registered!'))
+        .catch((err) => console.log('Service Worker failed:', err));
+    });
+  }
+</script>
+</body>
+</html>
